@@ -13,26 +13,29 @@ repositories {
 dependencies {
     annotationProcessor("org.projectlombok:lombok")
     annotationProcessor("io.micronaut:micronaut-http-validation")
-    implementation("io.micronaut:micronaut-http-client")
-    implementation("io.micronaut:micronaut-jackson-databind")
-    implementation("io.micronaut.rxjava3:micronaut-rxjava3")
-    implementation("io.micronaut.rxjava3:micronaut-rxjava3-http-client")
-    implementation("io.micronaut.views:micronaut-views-pebble")
-    implementation("jakarta.annotation:jakarta.annotation-api")
-    compileOnly("org.projectlombok:lombok")
-    runtimeOnly("ch.qos.logback:logback-classic")
-    testImplementation("org.awaitility:awaitility:4.2.0")
-    implementation("io.micronaut:micronaut-validation")
 
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-session")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    implementation("io.micronaut:micronaut-validation")
+    implementation("io.micronaut.redis:micronaut-redis-lettuce")
+
+    implementation("io.micronaut.views:micronaut-views-pebble")
+
+    implementation("jakarta.annotation:jakarta.annotation-api")
+
+    implementation("commons-codec:commons-codec:1.15")
+
+    compileOnly("org.projectlombok:lombok")
+
+    runtimeOnly("ch.qos.logback:logback-classic")
+
+    testImplementation("org.awaitility:awaitility:4.2.0")
 }
 
 
 application {
     mainClass.set("io.github.rjaros87.Application")
-}
-java {
-    sourceCompatibility = JavaVersion.toVersion("17")
-    targetCompatibility = JavaVersion.toVersion("17")
 }
 
 tasks {

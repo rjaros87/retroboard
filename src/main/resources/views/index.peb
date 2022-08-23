@@ -1,0 +1,56 @@
+{% extends './base.peb' %}
+{% block content %}
+    {% if board is empty %}
+        <h1 class="mt-5 font-silkscreen">Welcome Stranger!</h1>
+        <p class="lead">Create a new room for you and your teammates and share with them a link</p>
+        <form action="/create-room" method="post">
+            <div class="mb-3">
+                <label for="boardTitle" class="form-label">Room title</label>
+                <input name="boardTitle" type="text" class="form-control" id="boardTitle" aria-describedby="roomHelp" autocomplete="off">
+                <div id="roomHelp" class="form-text">[Optional] enter the room title</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+    {% else %}
+        {% set boardId = board.getBoardId().getId() %}
+        {% set boardPath = "/board/" + boardId %}
+        {% set boardUrl =  serverHost + ":" + serverPort + boardPath %}
+        <p class="lead">You have created a meeting room with id: <i><strong>{{ boardId }}</strong></i>.</p>
+        <p class="lead">Please copy below link and share with your teammates.</p>
+        <form>
+            <div class="input-group mb-3">
+                <input id="copy-input" type="text" class="form-control" readonly value="{{ boardUrl }}" aria-describedby="copy-button">
+                <button class="btn btn-outline-secondary" type="button" id="copy-button"
+                    data-toggle="tooltip" data-placement="button"
+                    title="Copy to Clipboard">Copy</button>
+            </div>
+        </form>
+        <p class="lead"><a href="{{ boardPath }}" class="btn btn-success">Open board</a></p>
+    {% endif %}
+
+
+{% endblock content%}
+{% block customJavaScript %}
+<script type="application/javascript">
+    $(document).ready(function() {
+        $('#copy-button').tooltip();
+        $('#copy-button').bind('click', function() {
+        var input = document.querySelector('#copy-input');
+        input.setSelectionRange(0, input.value.length + 1);
+        input.select();
+        navigator.clipboard.writeText(input.value).then(function() {
+            console.log('Async: Copying to clipboard was successful!');
+            $('#copy-button').trigger('copied', ['Copied!']);
+        }, function(err) {
+            console.error('Async: Could not copy text: ', err);
+            $('#copy-button').trigger('copied', ['Copy with Ctrl-c']);
+        });
+      });
+
+      $('#copy-button').bind('copied', function(event, message) {
+        const tooltip = bootstrap.Tooltip.getInstance('#copy-button');
+        tooltip.setContent({ '.tooltip-inner': message });
+      });
+    });
+</script>
+{% endblock customJavaScript %}

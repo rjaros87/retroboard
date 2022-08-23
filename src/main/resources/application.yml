@@ -1,6 +1,35 @@
 micronaut:
   application:
     name: retroboard
+
+  server:
+    host: localhost
+    port: 8080
+
+  router:
+    static-resources:
+      default:
+        enabled: true
+        mapping: "/static/**"
+        paths: classpath:public
+
+  session:
+    http:
+#      cookie: false
+#      header: true
+      redis:
+        enabled: true
+
+  views:
+    pebble:
+      enabled: true
+      default-extension: peb
+
+redis:
+  host: localhost
+  password: str0ng_passw0rd
+  port: 6379
+
 netty:
   default:
     allocator:
