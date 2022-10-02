@@ -1,13 +1,12 @@
 package io.github.rjaros87.controllers;
 
-import io.github.rjaros87.model.BoardId;
-import io.micronaut.http.HttpResponse;
+import io.github.rjaros87.model.Board;
+import io.github.rjaros87.storage.CacheClient;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.views.View;
+import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-
-import javax.validation.Valid;
 
 /**
  * Controller responsible for generating view for team retrospective meeting.
@@ -15,13 +14,15 @@ import javax.validation.Valid;
 @Slf4j
 @Controller("/board")
 public class BoardController {
+    @Inject
+    private CacheClient cacheClient;
 
     @View("board")
-    @Get("/{id}")
-    public HttpResponse<BoardId> board(@Valid String id) {
-        var boardId = new BoardId(id);
-        log.info("Going to return board view for token: {}", boardId);
+    @Get("/{boardId}")
+    public Board board(String boardId) {
+        log.info("Going to find board with id: {}", boardId);
 
-        return HttpResponse.ok(boardId);
+        return cacheClient.getBoard(boardId)
+                .doOnError(throwable -> log.error("An error occurred when fetching board: ", throwable)).block();
     }
 }

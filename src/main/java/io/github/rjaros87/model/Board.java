@@ -6,7 +6,6 @@ import io.micronaut.core.annotation.Introspected;
 public class Board {
     public static final String SESSION_KEY = "board";
     public static final String STORAGE_KEY = "retroboard:board:%s";
-    public static final String RESERVATION_KEY = "retroboard:reservation:board:%s";
 
     private BoardId boardId;
 

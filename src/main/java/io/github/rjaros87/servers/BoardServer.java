@@ -1,5 +1,6 @@
 package io.github.rjaros87.servers;
 
+import io.github.rjaros87.model.BoardMessage;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -22,7 +23,7 @@ import java.util.function.Predicate;
  */
 @Slf4j
 @Singleton
-@ServerWebSocket(value = "/meeting/board/{token}/{user}")
+@ServerWebSocket(value = "/meeting/board/{id}/{user}")
 public class BoardServer {
     private final WebSocketBroadcaster broadcaster;
 
@@ -32,42 +33,42 @@ public class BoardServer {
 
     @OnOpen
     @Produces(MediaType.APPLICATION_JSON)
-    public Publisher<String> onOpen(String token, String user, WebSocketSession session) {
+    public Publisher<BoardMessage> onOpen(String id, String user, WebSocketSession session) {
         String msg = user + " Joined!";
         log.info("Msg: {}, session {}", msg, session.getId());
 
-        return broadcaster.broadcast("{\"room\": \"" + token + "\", \"user\": \"" + user + "\"}",
-                isValidRoom(token, session));
+        return broadcaster.broadcast(new BoardMessage(id, user, msg),
+                isValidRoom(id, session));
     }
 
     @OnMessage
     @Consumes(MediaType.TEXT_PLAIN)
     @Produces(MediaType.TEXT_PLAIN)
-    public Publisher<String> onMessage(String token, String message, WebSocketSession session) {
-        String msg = "[" + token + "] " + message;
+    public Publisher<String> onMessage(String id, String message, WebSocketSession session) {
+        String msg = "[" + id + "] " + message;
         log.info("Got message from client {}", msg);
 
         String response = "{\"server\": " + message + "}";
 
 
-        return broadcaster.broadcast(response, MediaType.TEXT_PLAIN_TYPE, isValidRoom(token, session));
+        return broadcaster.broadcast(response, MediaType.TEXT_PLAIN_TYPE, isValidRoom(id, session));
     }
 
     @OnClose
-    public Publisher<String> onClose(String token, String user, WebSocketSession session, CloseReason closeReason) {
-        log.info("[{}, {}] Disconnected! CloseReason: {}", token, user, closeReason);
+    public Publisher<String> onClose(String id, String user, WebSocketSession session, CloseReason closeReason) {
+        log.info("[{}, {}] Disconnected! CloseReason: {}", id, user, closeReason);
 
         session.close(closeReason);
 
         String response = "{\"server\": {\"username\":\"" + user + "\", \"body\": \"Disconnected\"}}";
 
-        return broadcaster.broadcast(response, isValidRoom(token, session));
+        return broadcaster.broadcast(response, isValidRoom(id, session));
     }
 
-    private Predicate<WebSocketSession> isValidRoom(String token, WebSocketSession session) {
+    private Predicate<WebSocketSession> isValidRoom(String id, WebSocketSession session) {
         return s -> {
 //            boolean sessionEq = Objects.equals(s.getId(), session.getId());
-            var gameEq = token.equals(s.getUriVariables().get("token", String.class, null));
+            var gameEq = id.equals(s.getUriVariables().get("id", String.class, null));
 //            boolean sessionIsOpen = session.isOpen();
 //            return  sessionEq && gameEq && sessionIsOpen;
             return  gameEq;

@@ -15,5 +15,28 @@
         main > .container {
             padding: 60px 15px 0;
         }
+
+        .mh-90 {
+            min-height: 90% !important;
+        }
+
+        .pt-6 {
+            padding-top: 4rem !important
+        }
+
+        .assign-card {
+            position: absolute !important;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%,-50%);
+        }
+
+        .card-footer, .card-header {
+            line-height: 0.1em;
+        }
+
+        .card-footer > small {
+            font-size: 0.5em;
+        }
     </style>
 </head>

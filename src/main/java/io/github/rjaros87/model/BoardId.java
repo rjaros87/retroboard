@@ -3,12 +3,14 @@ package io.github.rjaros87.model;
 import io.micronaut.core.annotation.Introspected;
 import org.apache.commons.codec.digest.DigestUtils;
 
+import java.util.Objects;
+
 @Introspected
 public class BoardId {
     private String id;
 
     public BoardId(String id) {
-        this.id = id;
+        this.id = Objects.requireNonNullElseGet(id, this::generateId);
     }
 
     public BoardId() {

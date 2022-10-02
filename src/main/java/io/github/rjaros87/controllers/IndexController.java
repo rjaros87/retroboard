@@ -72,7 +72,7 @@ public class IndexController {
         //TODO: check if not exist and register board token in DB
         Board result = null;
 
-        var id = new BoardId();
+        var id = new BoardId(null);
         var board = new Board();
         board.setBoardTitle(boardTitle);
         board.setBoardId(id);

@@ -3,7 +3,6 @@ package io.github.rjaros87.storage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rjaros87.model.Board;
-import io.github.rjaros87.model.BoardId;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
@@ -42,10 +41,10 @@ public class CacheClient {
         return result;
     }
 
-    public Mono<Board> getBoard(BoardId boardId) {
+    public Mono<Board> getBoard(String boardId) {
         Mono<Board> result = Mono.empty();
 
-        var key = String.format(Board.STORAGE_KEY, boardId.getId());
+        var key = String.format(Board.STORAGE_KEY, boardId);
         var response = redis.get(key).block();
         if (response != null) {
             var objectMapper = new ObjectMapper();
