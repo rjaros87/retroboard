@@ -3,11 +3,17 @@ package io.github.rjaros87.storage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rjaros87.model.Board;
+import io.github.rjaros87.model.UserMessage;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
+import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import io.lettuce.core.pubsub.api.reactive.ChannelMessage;
+import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -16,9 +22,20 @@ import java.time.Duration;
 @Singleton
 public class CacheClient {
     private final RedisReactiveCommands<String, String> redis;
+    private final RedisPubSubReactiveCommands<String, String> redisSub;
+    private final RedisPubSubReactiveCommands<String, String> redisPub;
 
-    public CacheClient(StatefulRedisConnection<String, String> redisConnection) {
+    public final static String REDIS_CHANNEL = "channel";
+
+    public CacheClient(@Named("default") StatefulRedisConnection<String, String> redisConnection,
+                       @Named("default") StatefulRedisPubSubConnection<String, String> redisSubConnection,
+                       @Named("pub") StatefulRedisPubSubConnection<String, String> redisPubConnection
+                       ) {
         redis = redisConnection.reactive();
+        this.redisSub = redisSubConnection.reactive();
+        this.redisPub = redisPubConnection.reactive();
+
+        this.redisSub.subscribe(REDIS_CHANNEL).subscribe();
     }
 
     public Mono<String> storeBoard(Board board) {
@@ -58,5 +75,14 @@ public class CacheClient {
         }
 
         return result;
+    }
+
+    public Flux<ChannelMessage<String, String>> getCacheClientObserver() {
+       return redisSub.observeChannels();
+    }
+
+    public void publish(UserMessage userMessage) throws JsonProcessingException {
+        var objectMapper = new ObjectMapper();
+        redisPub.publish(REDIS_CHANNEL, objectMapper.writeValueAsString(userMessage)).block();
     }
 }

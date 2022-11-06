@@ -21,29 +21,30 @@
             </div>
         </div>
         <div id="MultipleContainers" class="row flex-fill fill d-flex justify-content-start">
-            <div id="good" class="col-3">
+            <div id="good" class="retro-category col-3">
                 <header>Good</header>
                 <section class="border border-2 rounded-1 border-success dropdown mh-90 StackedList"></section>
             </div>
-            <div id="bad" class="col-3">
+            <div id="bad" class="retro-category col-3">
                 <header>Bad</header>
                 <section class="border border-2 rounded-1 border-danger dropdown mh-90 StackedList"></section>
             </div>
-            <div id="actions" class="col-3">
+            <div id="actions" class="retro-category col-3">
                 <header>Actions</header>
                 <section class="border border-2 rounded-1 border-primary dropdown mh-90 StackedList"></section>
             </div>
-            <div id="kudos" class="col-3">
+            <div id="kudos" class="retro-category col-3">
                 <header>Kudos</header>
                 <section class="border border-2 rounded-1 border-dark dropdown mh-90 StackedList"></section>
             </div>
         </div>
 
-            <div class="row pb-3 text-center">
-                    <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addCard()">Add card</button>
-                    <section id="cardAnchor"></section>
-            </div>
+        <div class="row pb-3 text-center">
+                <button type="button" class="btn btn-primary btn-sm mt-2" onclick="addCard()">Add card</button>
+                <section id="cardAnchor"></section>
+        </div>
 
+        <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
 
         {#        <div id="debug" class="container">#}
         {#            <h3>Debug</h3>#}
@@ -83,6 +84,16 @@
         const Sortable = Draggable.Sortable;
         const Plugins = Draggable.Plugins;
 
+        const EventType = {
+            SET: 'set',
+            DELETE: 'delete',
+            LIKE: 'like',
+            DISLIKE: 'dislike',
+            ASSIGN: 'assign',
+            CONNECTED: 'connected',
+            DISCONNECTED: 'disconnected'
+        };
+
         const draggableClasses = {
             draggable: 'StackedListItem--isDraggable',
             capacity: 'draggable-container-parent--capacity',
@@ -98,47 +109,47 @@
             plugins: [Plugins.ResizeMirror],
         });
 
+        const myModal = new bootstrap.Modal(document.getElementById('usernameModal'), {"backdrop": "static"});
+
+        let connection;
+        let output;
+        let username;
         let lastOverContainer;
 
         sortable.on('drag:start', (evt) => {
-            console.log("drag:start");
-            // currentMediumChildren = sortable.getDraggableElementsForContainer(sortable.containers[1])
-            //         .length;
-            // capacityReached = currentMediumChildren === containerTwoCapacity;
+            console.log("drag:start", evt);
             lastOverContainer = evt.sourceContainer;
-            // containerTwoParent.classList.toggle(Classes.capacity, capacityReached);
         });
 
         sortable.on('sortable:sorted', (evt) => {
+            console.log('sortable:sorted start', evt);
             if (lastOverContainer === evt.dragEvent.overContainer) {
                 return;
             }
-
-            evt.dragEvent.data.source.classList.remove("assign-card");
+            console.log('sortable:sorted end', evt);
+            // evt.dragEvent.data.source.classList.remove("assign-card");
             lastOverContainer = evt.dragEvent.overContainer;
         });
 
         sortable.on('drag:stop', (evt) => {
-            console.log("drag:stop");
-            //sprawdzic czy zmienil kontener
-            evt.data.originalSource.classList.remove("assign-card");
-        });
+            console.log("drag:stop-> ", evt);
 
-        sortable.on('drag:stopped', (evt) => {
-            console.log("drag:stopped");
-            // evt.data.source.classList.remove("assign-card");
         });
 
         sortable.on('sortable:stop', (evt) => {
-            console.log("sortable:stop");
+            console.log("sortable:stop", evt);
+            const oldContainer = evt.data.oldContainer;
+            const newContainer = evt.data.newContainer;
+            console.log(oldContainer, newContainer, oldContainer === newContainer);
+            if (oldContainer === newContainer) {
+                console.log('Moved to the same container?!');
+                return;
+            }
+            const cardElement = evt.data.dragEvent.data.originalSource;
+            const category = newContainer.closest('.retro-category').getAttribute('id');
+            cardElement.classList.remove("assign-card");
+            sendInternal(EventType.ASSIGN, cardElement.dataset.id, category);
         });
-
-        var connection;
-        var output;
-        let username;
-
-        const myModal = new bootstrap.Modal(document.getElementById('usernameModal'), {"backdrop": "static"});
-
 
         $(function () {
             myModal.show();
@@ -146,7 +157,7 @@
 
         function connect() {
             username = $('#username').val();
-            if (username === null || username === undefined || username == "") {
+            if (username === null || username === undefined || username === "") {
                 console.error("Nickname empty. ", username);
                 return;
             }
@@ -157,7 +168,7 @@
             output = $('#output');
             connection = new WebSocket("ws://localhost:8080/meeting/board/{{ boardId }}/" + username);
             connection.onopen = function () {
-                sendInternal(username, 'joined');
+                sendInternal(EventType.CONNECTED, null, username);
                 $(".openOnConnect").collapse('toggle');
             };
 
@@ -168,6 +179,7 @@
 
             // Log messages from the server
             connection.onmessage = function (e) {
+                console.log("Raw msg: ", e)
                 if (e.data) {
                     appendResponse(e.data);
                 }
@@ -177,32 +189,64 @@
             };
         }
 
+        function sendInternal(eventType, cardId, content) {
+            const message = {};
+            message.content = content;
+            message.cardId = cardId;
+            message.eventType = eventType;
 
-        function send() {
-            sendInternal(username, $("#messageBody").val());
-        }
-
-        function sendInternal(user, body) {
-            var message = {};
-            message.username = user;
-            message.body = body;
             appendAndSend(message);
         }
 
         function appendAndSend(message) {
-            appendRequest(message);
-            connection.send(JSON.stringify(message));
+            // appendRequest(message);
+            const json = JSON.stringify(message);
+            console.log("Going to send: ", json);
+            connection.send(json);
         }
 
         function appendResponse(message) {
-            var asJson = JSON.parse(message);
+            const asJson = JSON.parse(message);
+            console.log("Got msg:", asJson);
             if (asJson.failure != null) {
                 appendToDocument("alert-warning", "glyphicon-cloud-download", message.body)
             } else if (asJson.error != null) {
                 appendToDocument("alert-danger", "glyphicon-cloud-download", message.body)
             } else {
+                switch (asJson.eventType) {
+                    case EventType.CONNECTED:
+                        createToast(asJson.content, "joined!");
+                        break;
+                    case EventType.SET:
+                        createCard()
+                        break;
+                    case EventType.ASSIGN:
+
+                        break;
+                    case EventType.DISCONNECTED:
+                        createToast(asJson.content, "disconnected!");
+                        break;
+                    default:
+                        console.error("Unrecognized event type:", asJson.eventType);
+
+                }
                 appendToDocument("alert-success", "glyphicon-cloud-download", "[Server response] " + asJson['username'] + ': ' + asJson['body'])
             }
+        }
+
+        function createToast(user, action) {
+            console.log("Going to create toast for user:", user);
+            const toastUUID = crypto.randomUUID()
+            const htmlToast = `<div id="${toastUUID}" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true">
+                                  <div class="d-flex">
+                                    <div class="toast-body">
+                                      <strong>${user}</strong> ${action}
+                                    </div>
+                                    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                                  </div>
+                                </div>`;
+            $('.toast-container').append(htmlToast);
+            $(`#${toastUUID}`).toast('show');
         }
 
         function appendRequest(message) {
@@ -210,15 +254,14 @@
         }
 
         function appendToDocument(divClass, prefix, message) {
-            var pre = document.createElement("p");
+            const pre = document.createElement("p");
             pre.style.wordWrap = "break-word";
-            var html = '<div class="col-md-12 alert ' + divClass + '"><span class="glyphicon ' + prefix + '"></span> ' + getTime() + '<br/>' + message + '</div>';
-            pre.innerHTML = html;
+            pre.innerHTML = '<div class="col-md-12 alert ' + divClass + '"><span class="glyphicon ' + prefix + '"></span> ' + getTime() + '<br/>' + message + '</div>';
             output.prepend(pre);
         }
 
         function getTime() {
-            var time = new Date();
+            const time = new Date();
             return time.getHours() + ':' + time.getMinutes() + ':' + time.getSeconds() + '.' + time.getMilliseconds();
         }
 
@@ -231,15 +274,22 @@
             }
         }
 
+        function inputChange(element) {
+            const cardId = element.closest('.card').dataset.id;
+
+            sendInternal(EventType.SET, cardId, element.value);
+        }
+
         function addCard() {
-            var card = document.createElement('div');
+            const card = document.createElement('div');
+            card.dataset.id = crypto.randomUUID();
             card.classList.add('card');
             card.classList.add('text-center');
             card.classList.add('m-1');
             card.classList.add('assign-card');
             card.classList.add('StackedListItem--isDraggable');
 
-            var html = `
+            card.innerHTML = `
               <div class="card-header">
                 <button class="btn btn-sm dislike">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-hand-thumbs-down-fill" viewBox="0 0 16 16">
@@ -255,14 +305,13 @@
               </div>
               <div class="card-body">
                 <p class="card-text">
-                <input class="form-control form-control-sm" type="text">
+                <input class="form-control form-control-sm" type="text" onchange="inputChange(this)">
                 </p>
               </div>
               <div class="card-footer">
                 <small class="text-muted">` + username + `</small>
               </div>
             `;
-            card.innerHTML = html;
             document.getElementById("cardAnchor").append(card);
         }
 

@@ -19,6 +19,7 @@ micronaut:
 #      header: true
       redis:
         enabled: true
+        server-name: default
 
   views:
     pebble:
@@ -26,9 +27,15 @@ micronaut:
       default-extension: peb
 
 redis:
-  host: localhost
-  password: str0ng_passw0rd
-  port: 6379
+  servers:
+    default:
+      host: localhost
+      port: 6379
+      password: str0ng_passw0rd
+    pub:
+      host: localhost
+      port: 6379
+      password: str0ng_passw0rd
 
 netty:
   default:
