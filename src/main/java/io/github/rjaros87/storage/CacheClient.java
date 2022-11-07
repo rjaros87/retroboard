@@ -3,7 +3,6 @@ package io.github.rjaros87.storage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rjaros87.model.Board;
-import io.github.rjaros87.model.UserMessage;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
@@ -81,8 +80,8 @@ public class CacheClient {
        return redisSub.observeChannels();
     }
 
-    public void publish(UserMessage userMessage) throws JsonProcessingException {
+    public void publish(StorageMessage storageMessage) throws JsonProcessingException {
         var objectMapper = new ObjectMapper();
-        redisPub.publish(REDIS_CHANNEL, objectMapper.writeValueAsString(userMessage)).block();
+        redisPub.publish(REDIS_CHANNEL, objectMapper.writeValueAsString(storageMessage)).block();
     }
 }

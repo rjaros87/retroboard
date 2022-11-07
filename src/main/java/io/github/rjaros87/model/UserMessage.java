@@ -12,5 +12,4 @@ import lombok.NoArgsConstructor;
 public class UserMessage {
     private UserBoard userBoard;
     private EventMessage eventMessage;
-    private String hostIp;
 }

@@ -7,6 +7,7 @@ import io.github.rjaros87.model.EventType;
 import io.github.rjaros87.model.UserBoard;
 import io.github.rjaros87.model.UserMessage;
 import io.github.rjaros87.storage.CacheClient;
+import io.github.rjaros87.storage.StorageMessage;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.RequestBean;
@@ -76,8 +77,8 @@ public class BoardServer {
      */
     @ExecuteOn(TaskExecutors.IO)
     private void processEvent(UserBoard userBoard, EventMessage message, WebSocketSession session) {
+        StorageMessage storageMessage;
         UserMessage userMessage;
-
         switch (message.getEventType()) {
             case CONNECTED:
             case DISCONNECTED:
@@ -86,14 +87,18 @@ public class BoardServer {
             case DELETE:
             case LIKE:
             case DISLIKE:
+
                     userMessage = UserMessage.builder()
                             .userBoard(userBoard)
                             .eventMessage(message)
+                            .build();
+                    storageMessage = StorageMessage.builder()
+                            .userMessage(userMessage)
                             .hostIp(hostIpAddress)
                             .build();
                 if(!Boolean.parseBoolean(System.getenv("DEBUG"))) {
                     log.info("Going to broadcast message on the server");
-                    broadcaster.broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
+                    broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
                             .orTimeout(500, TimeUnit.MILLISECONDS);
                 }
                 break;
@@ -101,8 +106,8 @@ public class BoardServer {
                 throw new UnsupportedOperationException("Unsupported event type: " + message.getEventType());
         }
         try {
-            if (userMessage != null) {
-                this.cacheClient.publish(userMessage);
+            if (storageMessage != null) {
+                this.cacheClient.publish(storageMessage);
             }
         } catch (JsonProcessingException e) {
             e.printStackTrace();
@@ -119,9 +124,10 @@ public class BoardServer {
         cacheClient.getCacheClientObserver().subscribe(message -> {
             try {
                 log.info("Got message from CacheClient publisher: {}", message.getMessage());
-                var userMessage = objectMapper.readValue(message.getMessage(), UserMessage.class);
-                if (!userMessage.getHostIp().equals(hostIpAddress)
+                var storageMessage = objectMapper.readValue(message.getMessage(), StorageMessage.class);
+                if (!storageMessage.getHostIp().equals(hostIpAddress)
                         || Boolean.parseBoolean(System.getenv("DEBUG"))) {
+                    var userMessage = storageMessage.getUserMessage();
                     var userBoard = userMessage.getUserBoard();
                     var eventMessage = userMessage.getEventMessage();
                     log.info("Going to broadcast msg from publisher: {}, for board: {}", eventMessage, userBoard.getBoardId());
