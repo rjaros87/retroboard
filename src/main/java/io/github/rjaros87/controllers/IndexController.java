@@ -31,7 +31,7 @@ public class IndexController {
     @Inject
     private CacheClient cacheClient;
 
-    @Value("${micronaut.server.host}")
+    @Value("${retroboard.domain}")
     String serverHost;
 
     @Value("${micronaut.server.port}")

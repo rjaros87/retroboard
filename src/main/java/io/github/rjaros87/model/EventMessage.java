@@ -1,5 +1,6 @@
 package io.github.rjaros87.model;
 
+import io.micronaut.core.annotation.ReflectiveAccess;
 import jakarta.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +16,7 @@ import javax.validation.constraints.NotNull;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ReflectiveAccess
 public class EventMessage {
     @NotNull
     private EventType eventType;

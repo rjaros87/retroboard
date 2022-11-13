@@ -1,10 +1,12 @@
 package io.github.rjaros87.model;
 
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import jakarta.annotation.Nullable;
 
 import javax.validation.constraints.Pattern;
 
+@ReflectiveAccess
 @Introspected
 public class BoardTitle {
 

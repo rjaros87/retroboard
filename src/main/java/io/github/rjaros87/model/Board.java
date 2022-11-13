@@ -1,7 +1,9 @@
 package io.github.rjaros87.model;
 
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
+@ReflectiveAccess
 @Introspected
 public class Board {
     public static final String SESSION_KEY = "board";

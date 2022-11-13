@@ -1,7 +1,9 @@
 package io.github.rjaros87.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
+@ReflectiveAccess
 public enum EventType {
     @JsonProperty("set")
     SET,

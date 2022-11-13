@@ -3,7 +3,7 @@ micronaut:
     name: retroboard
 
   server:
-    host: localhost
+    host: 0.0.0.0
     port: 8080
 
   router:
@@ -26,16 +26,23 @@ micronaut:
       enabled: true
       default-extension: peb
 
+retroboard:
+  domain: "${RETROBOARD_DOMAIN:localhost}"
+
 redis:
-  servers:
-    default:
-      host: localhost
-      port: 6379
-      password: str0ng_passw0rd
-    pub:
-      host: localhost
-      port: 6379
-      password: str0ng_passw0rd
+    servers:
+      default:
+        host: "${REDIS_DEFAULT_HOST:localhost}"
+        port: ${REDIS_DEFAULT_PORT:6379}
+        password: str0ng_passw0rd
+      pub:
+        host: "${REDIS_DEFAULT_HOST:localhost}"
+        port: ${REDIS_DEFAULT_PORT:6379}
+        password: str0ng_passw0rd
+      sub:
+        host: "${REDIS_SUB_HOST:localhost}"
+        port: ${REDIS_SUB_PORT:6380}
+        password: str0ng_passw0rd
 
 netty:
   default:

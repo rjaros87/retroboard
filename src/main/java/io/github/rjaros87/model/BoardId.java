@@ -1,10 +1,12 @@
 package io.github.rjaros87.model;
 
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.Objects;
 
+@ReflectiveAccess
 @Introspected
 public class BoardId {
     private String id;

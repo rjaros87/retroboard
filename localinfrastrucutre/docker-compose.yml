@@ -5,7 +5,7 @@ networks:
     driver: bridge
 
 services:
-  redis:
+  redis-master:
     image: 'bitnami/redis:latest'
     environment:
       - REDIS_REPLICATION_MODE=master
@@ -18,23 +18,38 @@ services:
     image: 'bitnami/redis:latest'
     environment:
       - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=redis
+      - REDIS_MASTER_HOST=redis-master
       - REDIS_MASTER_PASSWORD=str0ng_passw0rd
       - REDIS_PASSWORD=str0ng_passw0rd
     ports:
-      - '6379:6380'
+      - '6380:6379'
     depends_on:
-      - redis
+      - redis-master
     networks:
       - app-tier
-  redis-sentinel:
-    image: 'bitnami/redis-sentinel:latest'
+  retroboard-graal:
+    image: 'retroboard:0.1'
     environment:
-      - REDIS_MASTER_PASSWORD=str0ng_passw0rd
-    depends_on:
-      - redis
-      - redis-slave
-    ports:
-      - '26379-26381:26379'
+      - REDIS_DEFAULT_HOST=redis-master
+      - REDIS_SUB_HOST=redis-slave
+      - REDIS_DEFAULT_PORT=6379
+      - REDIS_SUB_PORT=6379
     networks:
       - app-tier
+    ports:
+      - '8080:8080'
+    depends_on:
+      - redis-master
+      - redis-slave
+
+#  redis-sentinel:
+#    image: 'bitnami/redis-sentinel:latest'
+#    environment:
+#      - REDIS_MASTER_PASSWORD=str0ng_passw0rd
+#    depends_on:
+#      - redis
+#      - redis-slave
+#    ports:
+#      - '26379-26381:26379'
+#    networks:
+#      - app-tier

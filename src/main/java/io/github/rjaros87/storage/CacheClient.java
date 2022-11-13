@@ -27,7 +27,7 @@ public class CacheClient {
     public final static String REDIS_CHANNEL = "channel";
 
     public CacheClient(@Named("default") StatefulRedisConnection<String, String> redisConnection,
-                       @Named("default") StatefulRedisPubSubConnection<String, String> redisSubConnection,
+                       @Named("sub") StatefulRedisPubSubConnection<String, String> redisSubConnection,
                        @Named("pub") StatefulRedisPubSubConnection<String, String> redisPubConnection
                        ) {
         redis = redisConnection.reactive();
@@ -69,7 +69,7 @@ public class CacheClient {
                 var board = objectMapper.readValue(response, Board.class);
                 result = Mono.just(board);
             } catch (JsonProcessingException e) {
-                log.error("Unable to convert JSON to Board object");
+                log.error("Unable to convert JSON to Board object", e);
             }
         }
 

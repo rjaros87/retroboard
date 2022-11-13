@@ -1,6 +1,6 @@
 plugins {
     id("com.github.johnrengelman.shadow") version "7.1.2"
-    id("io.micronaut.application") version "3.5.1"
+    id("io.micronaut.application") version "3.6.3"
 }
 
 version = "0.1"
@@ -27,8 +27,10 @@ dependencies {
     implementation("commons-codec:commons-codec:1.15")
 
     compileOnly("org.projectlombok:lombok")
+    compileOnly("org.graalvm.nativeimage:svm")
 
     runtimeOnly("ch.qos.logback:logback-classic")
+
 
     testImplementation("org.awaitility:awaitility:4.2.0")
 }
@@ -47,7 +49,14 @@ tasks {
         images = ["${System.env.DOCKER_IMAGE ?: project.name}:$project.version"]
     }
 }
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("17")
+    targetCompatibility = JavaVersion.toVersion("17")
+}
+
 graalvmNative.toolchainDetection = false
+
 micronaut {
     runtime("netty")
     testRuntime("junit5")
