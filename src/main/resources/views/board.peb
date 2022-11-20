@@ -60,6 +60,8 @@
         const Sortable = Draggable.Sortable;
         const Plugins = Draggable.Plugins;
 
+        const draggableClass = 'StackedListItem--isDraggable';
+
         const EventType = {
             SET: 'set',
             DELETE: 'delete',
@@ -71,7 +73,7 @@
         };
 
         const draggableClasses = {
-            draggable: 'StackedListItem--isDraggable',
+            draggable: draggableClass,
             capacity: 'draggable-container-parent--capacity',
         };
 
@@ -189,9 +191,14 @@
             const userMessage = JSON.parse(message);
             console.log("Got msg:", userMessage);
             if (userMessage.failure != null) {
+                //FIXME
                 appendToDocument("alert-warning", "glyphicon-cloud-download", message.body)
             } else if (userMessage.error != null) {
+                //FIXME
                 appendToDocument("alert-danger", "glyphicon-cloud-download", message.body)
+            } else if (Object.hasOwn(userMessage, "cardId") && Object.hasOwn(userMessage, "content") && Object.hasOwn(userMessage, "username")) {
+                console.log("Going to load card: ", userMessage);
+                loadCard(userMessage);
             } else {
                 const eventMessage = userMessage.eventMessage;
                 switch (eventMessage.eventType) {
@@ -223,7 +230,7 @@
                 card.find('.card-text > input').first().val(eventMessage.content);
                 //TODO; add card owner
             } else {
-                addCardElement(userMessage.userBoard.username, eventMessage.cardId, eventMessage.content, true, true);
+                addCardElement(userMessage.userBoard.username, eventMessage.cardId, eventMessage.content, true, true, null);
             }
         }
 
@@ -280,8 +287,6 @@
 
             sendInternal(EventType.SET, cardId, element.value);
 
-            const draggableClass = 'StackedListItem--isDraggable';
-
             //Allow only if card has some text.
             if (!card.classList.contains(draggableClass) && element.value.length > 0) {
                 card.classList.add(draggableClass);
@@ -289,11 +294,18 @@
         }
 
         function addCard() {
-            addCardElement(username, null, null, false, false);
+            addCardElement(username, null, null, false, false, null);
         }
 
-        function addCardElement(username, cardId, content, hidden, disabled) {
-            console.log("Going to add card for user:", username, cardId, content, hidden, disabled);
+        function loadCard(card) {
+            const hidden = !Object.hasOwn(card, "category") && username !== card.username;
+            const section = hidden ? null : `#${card.category} > section`;
+
+            addCardElement(card.username, card.cardId, card.content, hidden, username !== card.username, section);
+        }
+
+        function addCardElement(username, cardId, content, hidden, disabled, appendTo) {
+            console.log("Going to add card for user:", username, cardId, content, hidden, disabled, appendTo);
             const card = document.createElement('div');
             if (cardId != null && cardId.length > 0) {
                 card.dataset.id = cardId;
@@ -304,7 +316,13 @@
             card.classList.add('card');
             card.classList.add('text-center');
             card.classList.add('m-1');
-            card.classList.add('assign-card');
+
+            if (appendTo === null) {
+                card.classList.add('assign-card');
+            } else {
+                card.classList.add(draggableClass);
+            }
+
             if (hidden) {
                 card.classList.add('d-none');
             }
@@ -332,7 +350,11 @@
                 <small class="text-muted">` + username + `</small>
               </div>
             `;
-            document.getElementById("cardAnchor").append(card);
+
+            if (appendTo === null) {
+                appendTo = "#cardAnchor"
+            }
+            $(appendTo).append(card);
         }
 
         window.onbeforeunload = disconnect();

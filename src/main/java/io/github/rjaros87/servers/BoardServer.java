@@ -7,6 +7,7 @@ import io.github.rjaros87.model.EventType;
 import io.github.rjaros87.model.UserBoard;
 import io.github.rjaros87.model.UserMessage;
 import io.github.rjaros87.storage.CacheClient;
+import io.github.rjaros87.storage.EventFields;
 import io.github.rjaros87.storage.StorageMessage;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -60,6 +61,8 @@ public class BoardServer {
     @Consumes(MediaType.APPLICATION_JSON)
     public void onOpen(@RequestBean UserBoard userBoard, WebSocketSession session) {
         log.info("{} Joined!, session {}", userBoard.getUsername(), session.getId());
+
+        cacheClient.sendCardsToConnectedUser(userBoard.getBoardId(), session);
     }
 
     @OnMessage
@@ -79,32 +82,41 @@ public class BoardServer {
     private void processEvent(UserBoard userBoard, EventMessage message, WebSocketSession session) {
         StorageMessage storageMessage;
         UserMessage userMessage;
+
+        var cardId = message.getCardId();
+        var boardId = userBoard.getBoardId();
         switch (message.getEventType()) {
             case CONNECTED:
             case DISCONNECTED:
-            case SET:
-            case ASSIGN:
             case DELETE:
             case LIKE:
             case DISLIKE:
-
-                    userMessage = UserMessage.builder()
-                            .userBoard(userBoard)
-                            .eventMessage(message)
-                            .build();
-                    storageMessage = StorageMessage.builder()
-                            .userMessage(userMessage)
-                            .hostIp(hostIpAddress)
-                            .build();
-                if(!Boolean.parseBoolean(System.getenv("DEBUG"))) {
-                    log.info("Going to broadcast message on the server");
-                    broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
-                            .orTimeout(500, TimeUnit.MILLISECONDS);
-                }
+                break;
+            case SET:
+                cacheClient.storeEvent(EventFields.CONTENT, boardId, cardId, message.getContent(), userBoard.getUsername());
+                cacheClient.assignCardToBoard(userBoard.getBoardId(), cardId);
+                break;
+            case ASSIGN:
+                cacheClient.storeEvent(EventFields.CATEGORY, boardId, cardId, message.getContent());
                 break;
             default:
                 throw new UnsupportedOperationException("Unsupported event type: " + message.getEventType());
         }
+
+        userMessage = UserMessage.builder()
+                .userBoard(userBoard)
+                .eventMessage(message)
+                .build();
+        storageMessage = StorageMessage.builder()
+                .userMessage(userMessage)
+                .hostIp(hostIpAddress)
+                .build();
+        if(!Boolean.parseBoolean(System.getenv("DEBUG"))) {
+            log.info("Going to broadcast message on the server");
+            broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
+                    .orTimeout(500, TimeUnit.MILLISECONDS);
+        }
+
         try {
             if (storageMessage != null) {
                 this.cacheClient.publish(storageMessage);
@@ -129,9 +141,8 @@ public class BoardServer {
                         || Boolean.parseBoolean(System.getenv("DEBUG"))) {
                     var userMessage = storageMessage.getUserMessage();
                     var userBoard = userMessage.getUserBoard();
-                    var eventMessage = userMessage.getEventMessage();
-                    log.info("Going to broadcast msg from publisher: {}, for board: {}", eventMessage, userBoard.getBoardId());
-                    broadcaster.broadcastAsync(eventMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
+                    log.info("Going to broadcast msg from publisher: {}, for board: {}", userMessage, userBoard.getBoardId());
+                    broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
                             .orTimeout(500, TimeUnit.MILLISECONDS);
                 }
             } catch (JsonProcessingException e) {
