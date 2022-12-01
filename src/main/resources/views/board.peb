@@ -319,7 +319,7 @@
 
             if (appendTo === null) {
                 card.classList.add('assign-card');
-            } else {
+            } else if (!disabled) { // If card belongs to the user
                 card.classList.add(draggableClass);
             }
 
