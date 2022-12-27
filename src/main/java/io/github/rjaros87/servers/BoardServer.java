@@ -46,7 +46,7 @@ public class BoardServer {
     public BoardServer(WebSocketBroadcaster broadcaster, CacheClient cacheClient) {
         this.broadcaster = broadcaster;
         this.cacheClient = cacheClient;
-        try(final DatagramSocket socket = new DatagramSocket()){
+        try (final DatagramSocket socket = new DatagramSocket()) {
             socket.connect(InetAddress.getByName("8.8.8.8"), 10002);
             hostIpAddress = socket.getLocalAddress().getHostAddress();
             log.info("Server IP address: {}", hostIpAddress);
@@ -75,46 +75,72 @@ public class BoardServer {
 
     /**
      * Function store events from the client into the Cache
+     *
      * @param userBoard
      * @param message
      */
     @ExecuteOn(TaskExecutors.IO)
     private void processEvent(UserBoard userBoard, EventMessage message, WebSocketSession session) {
-        StorageMessage storageMessage;
-        UserMessage userMessage;
-
         var cardId = message.getCardId();
         var boardId = userBoard.getBoardId();
+
         switch (message.getEventType()) {
             case CONNECTED:
             case DISCONNECTED:
+                publishEvent(userBoard, message);
+                break;
             case DELETE:
+                break;
             case LIKE:
+                cacheClient.storeIncrementEvent(EventFields.LIKE, boardId, cardId, userBoard.getUsername())
+                    .subscribe(
+                        result -> {
+                            log.info("Got result from like event: {}", result);
+                            message.setContent(result.toString());
+                            publishEvent(userBoard, message, true);
+                        }
+                    );
+                break;
             case DISLIKE:
+                cacheClient.storeIncrementEvent(EventFields.DISLIKE, boardId, cardId, userBoard.getUsername())
+                    .subscribe(
+                        result -> {
+                            log.info("Got result from dislike event: {}", result);
+                            message.setContent(result.toString());
+                            publishEvent(userBoard, message, true);
+                        }
+                    );
                 break;
             case SET:
-                cacheClient.storeEvent(EventFields.CONTENT, boardId, cardId, message.getContent(), userBoard.getUsername());
-                cacheClient.assignCardToBoard(userBoard.getBoardId(), cardId);
+                cacheClient.storeEvent(EventFields.CONTENT, boardId, cardId, message.getContent(), userBoard.getUsername())
+                    .subscribe(result -> {
+                            cacheClient.assignCardToBoard(userBoard.getBoardId(), cardId).subscribe();
+                            publishEvent(userBoard, message);
+                        }
+                    );
                 break;
             case ASSIGN:
-                cacheClient.storeEvent(EventFields.CATEGORY, boardId, cardId, message.getContent());
+                cacheClient.storeEvent(EventFields.CATEGORY, boardId, cardId, message.getContent())
+                    .subscribe(result -> publishEvent(userBoard, message));
                 break;
             default:
                 throw new UnsupportedOperationException("Unsupported event type: " + message.getEventType());
         }
+    }
 
-        userMessage = UserMessage.builder()
-                .userBoard(userBoard)
-                .eventMessage(message)
-                .build();
-        storageMessage = StorageMessage.builder()
-                .userMessage(userMessage)
-                .hostIp(hostIpAddress)
-                .build();
-        if(!Boolean.parseBoolean(System.getenv("DEBUG"))) {
+    public void publishEvent(UserBoard userBoard, EventMessage message, boolean forceBroadcast) {
+        var userMessage = UserMessage.builder()
+            .userBoard(userBoard)
+            .eventMessage(message)
+            .build();
+        var storageMessage = StorageMessage.builder()
+            .userMessage(userMessage)
+            .hostIp(hostIpAddress)
+            .build();
+        if (!Boolean.parseBoolean(System.getenv("DEBUG"))) {
             log.info("Going to broadcast message on the server");
-            broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
-                    .orTimeout(500, TimeUnit.MILLISECONDS);
+            broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard, forceBroadcast))
+                .orTimeout(500, TimeUnit.MILLISECONDS);
         }
 
         try {
@@ -124,6 +150,10 @@ public class BoardServer {
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
+    }
+
+    public void publishEvent(UserBoard userBoard, EventMessage message) {
+        publishEvent(userBoard, message, false);
     }
 
     /**
@@ -138,12 +168,16 @@ public class BoardServer {
                 log.info("Got message from CacheClient publisher: {}", message.getMessage());
                 var storageMessage = objectMapper.readValue(message.getMessage(), StorageMessage.class);
                 if (!storageMessage.getHostIp().equals(hostIpAddress)
-                        || Boolean.parseBoolean(System.getenv("DEBUG"))) {
+                    || Boolean.parseBoolean(System.getenv("DEBUG"))) {
                     var userMessage = storageMessage.getUserMessage();
                     var userBoard = userMessage.getUserBoard();
                     log.info("Going to broadcast msg from publisher: {}, for board: {}", userMessage, userBoard.getBoardId());
-                    broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard))
-                            .orTimeout(500, TimeUnit.MILLISECONDS);
+                    var eventTypeMessage = userMessage.getEventMessage().getEventType();
+                    var forceBroadcast = eventTypeMessage.equals(EventType.LIKE) ||
+                        eventTypeMessage.equals(EventType.DISLIKE);
+                    broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard,
+                        forceBroadcast))
+                        .orTimeout(500, TimeUnit.MILLISECONDS);
                 }
             } catch (JsonProcessingException e) {
                 log.error("Unable to convert JSON to Board object", e);
@@ -161,17 +195,19 @@ public class BoardServer {
         session.close(closeReason);
     }
 
-    private Predicate<WebSocketSession> isValidRoom(UserBoard userBoard) {
+    private Predicate<WebSocketSession> isValidRoom(UserBoard userBoard, boolean forceBroadcast) {
         return s -> {
             var validUserBoard = userBoard.getBoardId().equals(s.getUriVariables()
-                    .get("boardId", String.class, null));
+                .get("boardId", String.class, null));
             var validConsumers = !userBoard.getUsername().equalsIgnoreCase(s.getUriVariables()
-                    .get("username", String.class, null));
-//            return  validUserBoard && validConsumers;
-            log.info("internal valid : {}", validUserBoard);
-            log.info("user the same?: {} = {}, {}", userBoard.getUsername(), s.getUriVariables()
-                    .get("username", String.class, null), validConsumers);
-            return  validUserBoard && validConsumers;
+                .get("username", String.class, null));
+
+            log.info("internal valid : {}, user the same?: {} = {}, {}, forceBroadcast?: {}", validUserBoard,
+                userBoard.getUsername(),
+                s.getUriVariables().get("username", String.class, null), validConsumers,
+                forceBroadcast);
+
+            return validUserBoard && (validConsumers || forceBroadcast);
         };
     }
 }

@@ -34,6 +34,7 @@ services:
       - REDIS_SUB_HOST=redis-slave
       - REDIS_DEFAULT_PORT=6379
       - REDIS_SUB_PORT=6379
+      - RETROBOARD_DOMAIN=localhost
     networks:
       - app-tier
     ports:

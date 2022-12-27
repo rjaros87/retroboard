@@ -2,10 +2,7 @@ package io.github.rjaros87.model;
 
 import io.micronaut.core.annotation.ReflectiveAccess;
 import jakarta.annotation.Nullable;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import javax.validation.constraints.NotNull;
 
@@ -25,5 +22,6 @@ public class EventMessage {
     private String cardId;
 
     @Nullable
+    @Setter
     private String content;
 }

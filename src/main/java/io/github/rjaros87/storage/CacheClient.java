@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class CacheClient {
     private final static String BOARD_CARDS = "retroboard:board:%s:cards";
     private final static String BOARD_CARD = "retroboard:board:%s:cardId:%s";
+    private final static String BOARD_CARD_LIKES = BOARD_CARD + ":%s";
 
     private final RedisReactiveCommands<String, String> redis;
     private final RedisPubSubReactiveCommands<String, String> redisSub;
@@ -53,6 +54,7 @@ public class CacheClient {
 
         var key = String.format(Board.STORAGE_KEY, board.getBoardId().getId());
         try {
+            // FIXME: https://projectreactor.io/docs/core/release/reference/#faq.wrap-blocking
             var value = objectMapper.writeValueAsString(board);
             var setArgs = new SetArgs()
                     .nx()
@@ -66,14 +68,12 @@ public class CacheClient {
         return result;
     }
 
-    public void storeEvent(EventFields field, String boardId, String cardId, String content) {
-        storeEvent(field, boardId, cardId, content, null);
+    public Mono<Long> storeEvent(EventFields field, String boardId, String cardId, String content) {
+        return storeEvent(field, boardId, cardId, content, null);
     }
 
-    public void storeEvent(EventFields field, String boardId, String cardId, String content, String username) {
-        if (cardId == null) {
-            throw new RuntimeException("CardId cannot be null!");
-        }
+    public Mono<Long> storeEvent(EventFields field, String boardId, String cardId, String content, String username) {
+        validateCardId(cardId);
 
         var key = String.format(BOARD_CARD, boardId, cardId);
 
@@ -84,33 +84,69 @@ public class CacheClient {
             fields.put(EventFields.USERNAME.getFieldKey(), username);
         }
 
-        redis.hset(key, fields).subscribe(
-                result -> log.debug("hset for key: {}, fields: {}", key, fields),
-                throwable -> log.error("Error during hset for key: {}, field: {}, content: {}, error: {}",
-                        key, field, content, throwable.getMessage())
-        );
+        return redis.hset(key, fields)
+                .doOnSuccess(result -> log.debug("hset for key: {}, fields: {}", key, fields))
+                .doOnError(throwable -> log.error("Error during hset for key: {}, field: {}, content: {}, error: {}",
+                        key, field, content, throwable.getMessage()));
     }
 
-    public void assignCardToBoard(String boardId, String cardId) {
+    public Mono<Long> storeIncrementEvent(EventFields field, String boardId, String cardId, String username) {
+        validateCardId(cardId);
+
+        var key = String.format(BOARD_CARD_LIKES, boardId, cardId, field.getFieldKey());
+
+        if (field.equals(EventFields.LIKE) || field.equals(EventFields.DISLIKE)) {
+            return redis.sadd(key, username)
+                    .doOnError(
+                            throwable -> log.error("Error during sadd for key: {}, field: {}, username: {}, error: {}",
+                                    key, field, username, throwable.getMessage())
+                    )
+                    .flatMap(res -> redis.scard(key));
+        } else {
+            throw new RuntimeException("Unsupported event field for increment: " + field.getFieldKey());
+        }
+    }
+    public Mono<Long> storeDecrementEvent(EventFields field, String boardId, String cardId, String username) {
+        validateCardId(cardId);
+
+        var key = String.format(BOARD_CARD_LIKES, boardId, cardId, field.getFieldKey());
+
+        if (field.equals(EventFields.DISLIKE)) {
+            return redis.sadd(key, username).doOnError(
+                throwable -> log.error("Error during srem for key: {}, field: {}, username: {}, error: {}",
+                    key, field, username, throwable.getMessage())
+            )
+                .flatMap(res -> redis.scard(key));
+        } else {
+            throw new RuntimeException("Unsupported event field for increment: " + field.getFieldKey());
+        }
+    }
+
+    private void validateCardId(String cardId) {
         if (cardId == null) {
             throw new RuntimeException("CardId cannot be null!");
         }
+    }
+
+    public Mono<Long> assignCardToBoard(String boardId, String cardId) {
+        validateCardId(cardId);
 
         var key = String.format(BOARD_CARDS, boardId);
 
-        redis.sadd(key, cardId).subscribe(
-                saddResult -> {
-                    log.debug("sadd for key: {}, cardId: {}", key, cardId);
+        return redis.sadd(key, cardId)
+                .doOnSuccess(
+                        saddResult -> {
+                            log.debug("sadd for key: {}, cardId: {}", key, cardId);
 
-                    redis.expire(key, Duration.ofHours(1)).subscribe(
-                            expireResult -> log.debug("Set expire for key: {}", key),
-                            expireThrowable -> log.error("Error during set expire for key: {}, error: {}",
-                                    key, expireThrowable.getMessage())
-                    );
-                },
-                saddThrowable -> log.error("Error during adding to set for key: {}, error: {}",
-                        key, saddThrowable.getMessage())
-        );
+                            redis.expire(key, Duration.ofHours(1)).subscribe(
+                                    expireResult -> log.debug("Set expire for key: {}", key),
+                                    expireThrowable -> log.error("Error during set expire for key: {}, error: {}",
+                                            key, expireThrowable.getMessage())
+                            );
+                        }
+                )
+                .doOnError(saddThrowable -> log.error("Error during adding to set for key: {}, error: {}",
+                        key, saddThrowable.getMessage()));
     }
 
     public void sendCardsToConnectedUser(String boardId, WebSocketSession session) {
