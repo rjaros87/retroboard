@@ -341,11 +341,12 @@
             const hidden = !Object.hasOwn(card, "category") && username !== card.username;
             const section = hidden ? null : `#${card.category} > section`;
 
-            addCardElement(card.username, card.cardId, card.content, hidden, username !== card.username, section);
+            addCardElement(card.username, card.cardId, card.content, hidden, username !== card.username, section,
+                    card.likes, card.dislikes);
         }
 
-        function addCardElement(username, cardId, content, hidden, disabled, appendTo) {
-            console.log("Going to add card for user:", username, cardId, content, hidden, disabled, appendTo);
+        function addCardElement(username, cardId, content, hidden, disabled, appendTo, likes = 0, dislikes = 0) {
+            console.log("Going to add card for user:", username, cardId, content, hidden, disabled, appendTo, likes, dislikes);
             const card = document.createElement('div');
             if (cardId != null && cardId.length > 0) {
                 card.dataset.id = cardId;
@@ -386,9 +387,9 @@
 
             card.innerHTML = `
               <div class="card-header">
-                <span class="badge text-bg-danger dislikes">0</span>
+                <span class="badge text-bg-danger dislikes">${dislikes}</span>
                 ${disabled ? emotionAction : ''}
-                <span class="badge text-bg-success likes">0</span>
+                <span class="badge text-bg-success likes">${likes}</span>
                 ${disabled ? '' : deleteAction}
               </div>
               <div class="card-body">

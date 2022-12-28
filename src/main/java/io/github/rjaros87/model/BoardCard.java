@@ -13,6 +13,6 @@ public class BoardCard {
     private String category;
     private String content;
     private String username;
-    private Integer likes;
-    private Integer dislikes;
+    private Long likes;
+    private Long dislikes;
 }

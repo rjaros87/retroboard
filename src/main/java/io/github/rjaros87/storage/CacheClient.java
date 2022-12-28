@@ -169,12 +169,21 @@ public class CacheClient {
             log.debug("Going to fetch: {} cards", cardIds.size());
             for (String cardId : cardIds) {
                 var key = String.format(BOARD_CARD, boardId, cardId);
+                var keyLikes = String.format(BOARD_CARD_LIKES, boardId, cardId, EventFields.LIKE.getFieldKey());
+                var keyDislikes = String.format(BOARD_CARD_LIKES, boardId, cardId,
+                    EventFields.DISLIKE.getFieldKey());
+
                 log.debug("Going to fetch hash: {}", key);
                 var boardCard = BoardCard.builder();
                 boardCard.cardId(cardId);
                 var brokenBoardCard = new AtomicBoolean(false);
 
-                redis.hgetall(key).subscribe(
+                var likes = redis.scard(keyLikes);
+                var dislikes = redis.scard(keyDislikes);
+
+                var cardData = redis.hgetall(key);
+
+                cardData.subscribe(
                         //FIXME: needs to be optimised, to send a batch of cards instead one by one
                         card -> {
                             log.debug("Got card: {}", card);
@@ -182,14 +191,13 @@ public class CacheClient {
                             var cardKey = card.getKey();
                             var eventField = EventFields.findByKey(cardKey);
                             if (eventField == null) {
+                                log.error("Card cannot have null eventField");
                                 brokenBoardCard.set(true);
                             } else {
                                 switch (eventField) {
                                     case CATEGORY -> boardCard.category(cardValue);
                                     case CONTENT -> boardCard.content(cardValue);
                                     case USERNAME -> boardCard.username(cardValue);
-                                    case DISLIKE ->  boardCard.dislikes(Integer.valueOf(cardValue));
-                                    case LIKE -> boardCard.likes(Integer.valueOf(cardValue));
                                     default -> log.error("Unsupported key: {}", cardKey);
                                 }
                             }
@@ -197,7 +205,21 @@ public class CacheClient {
                         throwable -> log.error("Unable to fetch card due to:", throwable),
                         () -> {
                             if (!brokenBoardCard.get()) {
-                                session.sendSync(boardCard.build(), MediaType.APPLICATION_JSON_TYPE);
+                                likes.subscribe(
+                                    resLikes -> {
+                                        log.info("Number of likes: {}, for key: {}", resLikes, keyLikes);
+                                        boardCard.likes(resLikes);
+                                        dislikes.subscribe(
+                                            resDislike -> {
+                                                log.info("Number of dislikes: {}, for key: {}", resDislike, keyDislikes);
+                                                boardCard.dislikes(resDislike);
+                                            },
+                                            disLikesThrowable -> log.error("Unable to fetch dislikes onOpen due to:", disLikesThrowable),
+                                            () -> session.sendSync(boardCard.build(), MediaType.APPLICATION_JSON_TYPE)
+                                        );
+                                    },
+                                    likesThrowable -> log.error("Unable to fetch likes onOpen due to:", likesThrowable)
+                                );
                             }
                         }
                 );
