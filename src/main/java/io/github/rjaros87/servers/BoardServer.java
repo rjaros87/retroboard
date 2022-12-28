@@ -92,7 +92,7 @@ public class BoardServer {
             case DELETE:
                 break;
             case LIKE:
-                cacheClient.storeIncrementEvent(EventFields.LIKE, boardId, cardId, userBoard.getUsername())
+                cacheClient.processEmotionEvent(EventFields.LIKE, boardId, userBoard.getUsername(), message)
                     .subscribe(
                         result -> {
                             log.info("Got result from like event: {}", result);
@@ -102,7 +102,7 @@ public class BoardServer {
                     );
                 break;
             case DISLIKE:
-                cacheClient.storeIncrementEvent(EventFields.DISLIKE, boardId, cardId, userBoard.getUsername())
+                cacheClient.processEmotionEvent(EventFields.DISLIKE, boardId, userBoard.getUsername(), message)
                     .subscribe(
                         result -> {
                             log.info("Got result from dislike event: {}", result);

@@ -3,6 +3,8 @@ package io.github.rjaros87.model;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import lombok.*;
 
+import java.util.Collection;
+
 @Getter
 @Builder
 @NoArgsConstructor
@@ -13,6 +15,8 @@ public class BoardCard {
     private String category;
     private String content;
     private String username;
-    private Long likes;
-    private Long dislikes;
+    @Singular
+    private Collection<String> likes;
+    @Singular
+    private Collection<String> dislikes;
 }

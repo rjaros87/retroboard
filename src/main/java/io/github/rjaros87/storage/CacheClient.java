@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rjaros87.model.Board;
 import io.github.rjaros87.model.BoardCard;
+import io.github.rjaros87.model.EventMessage;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
@@ -90,12 +91,25 @@ public class CacheClient {
                         key, field, content, throwable.getMessage()));
     }
 
+    public Mono<Long> processEmotionEvent(EventFields field, String boardId, String username, EventMessage message) {
+        var cardId = message.getCardId();
+        var content = Integer.parseInt(message.getContent());
+
+        log.debug("Going to process event for content: {}", content);
+        if (content < 1) {
+            return storeDecrementEvent(field, boardId, cardId, username);
+        }
+        return storeIncrementEvent(field, boardId, cardId, username);
+    }
+
     public Mono<Long> storeIncrementEvent(EventFields field, String boardId, String cardId, String username) {
         validateCardId(cardId);
 
         var key = String.format(BOARD_CARD_LIKES, boardId, cardId, field.getFieldKey());
 
         if (field.equals(EventFields.LIKE) || field.equals(EventFields.DISLIKE)) {
+            log.debug("Going to increment {} list for cardId: {}, for boardId: {}", field.getFieldKey(), cardId,
+                boardId);
             return redis.sadd(key, username)
                     .doOnError(
                             throwable -> log.error("Error during sadd for key: {}, field: {}, username: {}, error: {}",
@@ -111,8 +125,10 @@ public class CacheClient {
 
         var key = String.format(BOARD_CARD_LIKES, boardId, cardId, field.getFieldKey());
 
-        if (field.equals(EventFields.DISLIKE)) {
-            return redis.sadd(key, username).doOnError(
+        if (field.equals(EventFields.LIKE) || field.equals(EventFields.DISLIKE)) {
+            log.debug("Going to decrement {} list for cardId: {}, for boardId: {}", field.getFieldKey(), cardId,
+                boardId);
+            return redis.srem(key, username).doOnError(
                 throwable -> log.error("Error during srem for key: {}, field: {}, username: {}, error: {}",
                     key, field, username, throwable.getMessage())
             )
@@ -178,8 +194,8 @@ public class CacheClient {
                 boardCard.cardId(cardId);
                 var brokenBoardCard = new AtomicBoolean(false);
 
-                var likes = redis.scard(keyLikes);
-                var dislikes = redis.scard(keyDislikes);
+                var likes = redis.smembers(keyLikes);
+                var dislikes = redis.smembers(keyDislikes);
 
                 var cardData = redis.hgetall(key);
 
@@ -208,17 +224,17 @@ public class CacheClient {
                                 likes.subscribe(
                                     resLikes -> {
                                         log.info("Number of likes: {}, for key: {}", resLikes, keyLikes);
-                                        boardCard.likes(resLikes);
-                                        dislikes.subscribe(
-                                            resDislike -> {
-                                                log.info("Number of dislikes: {}, for key: {}", resDislike, keyDislikes);
-                                                boardCard.dislikes(resDislike);
-                                            },
-                                            disLikesThrowable -> log.error("Unable to fetch dislikes onOpen due to:", disLikesThrowable),
-                                            () -> session.sendSync(boardCard.build(), MediaType.APPLICATION_JSON_TYPE)
-                                        );
+                                        boardCard.like(resLikes);
                                     },
-                                    likesThrowable -> log.error("Unable to fetch likes onOpen due to:", likesThrowable)
+                                    likesThrowable -> log.error("Unable to fetch likes onOpen due to:", likesThrowable),
+                                    () -> dislikes.subscribe(
+                                        resDislike -> {
+                                            log.info("Number of dislikes: {}, for key: {}", resDislike, keyDislikes);
+                                            boardCard.dislike(resDislike);
+                                        },
+                                        disLikesThrowable -> log.error("Unable to fetch dislikes onOpen due to:", disLikesThrowable),
+                                        () -> session.sendSync(boardCard.build(), MediaType.APPLICATION_JSON_TYPE)
+                                    )
                                 );
                             }
                         }
