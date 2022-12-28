@@ -58,8 +58,8 @@ public class CacheClient {
             // FIXME: https://projectreactor.io/docs/core/release/reference/#faq.wrap-blocking
             var value = objectMapper.writeValueAsString(board);
             var setArgs = new SetArgs()
-                    .nx()
-                    .ex(Duration.ofHours(2));
+                .nx()
+                .ex(Duration.ofHours(2));
             result = redis.set(key, value, setArgs);
         } catch (JsonProcessingException e) {
             log.error("Unable to convert Board to JSON string: ", e);
@@ -86,9 +86,9 @@ public class CacheClient {
         }
 
         return redis.hset(key, fields)
-                .doOnSuccess(result -> log.debug("hset for key: {}, fields: {}", key, fields))
-                .doOnError(throwable -> log.error("Error during hset for key: {}, field: {}, content: {}, error: {}",
-                        key, field, content, throwable.getMessage()));
+            .doOnSuccess(result -> log.debug("hset for key: {}, fields: {}", key, fields))
+            .doOnError(throwable -> log.error("Error during hset for key: {}, field: {}, content: {}, error: {}",
+                key, field, content, throwable.getMessage()));
     }
 
     public Mono<Long> processEmotionEvent(EventFields field, String boardId, String username, EventMessage message) {
@@ -111,15 +111,16 @@ public class CacheClient {
             log.debug("Going to increment {} list for cardId: {}, for boardId: {}", field.getFieldKey(), cardId,
                 boardId);
             return redis.sadd(key, username)
-                    .doOnError(
-                            throwable -> log.error("Error during sadd for key: {}, field: {}, username: {}, error: {}",
-                                    key, field, username, throwable.getMessage())
-                    )
-                    .flatMap(res -> redis.scard(key));
+                .doOnError(
+                    throwable -> log.error("Error during sadd for key: {}, field: {}, username: {}, error: {}",
+                        key, field, username, throwable.getMessage())
+                )
+                .flatMap(res -> redis.scard(key));
         } else {
             throw new RuntimeException("Unsupported event field for increment: " + field.getFieldKey());
         }
     }
+
     public Mono<Long> storeDecrementEvent(EventFields field, String boardId, String cardId, String username) {
         validateCardId(cardId);
 
@@ -150,19 +151,19 @@ public class CacheClient {
         var key = String.format(BOARD_CARDS, boardId);
 
         return redis.sadd(key, cardId)
-                .doOnSuccess(
-                        saddResult -> {
-                            log.debug("sadd for key: {}, cardId: {}", key, cardId);
+            .doOnSuccess(
+                saddResult -> {
+                    log.debug("sadd for key: {}, cardId: {}", key, cardId);
 
-                            redis.expire(key, Duration.ofHours(1)).subscribe(
-                                    expireResult -> log.debug("Set expire for key: {}", key),
-                                    expireThrowable -> log.error("Error during set expire for key: {}, error: {}",
-                                            key, expireThrowable.getMessage())
-                            );
-                        }
-                )
-                .doOnError(saddThrowable -> log.error("Error during adding to set for key: {}, error: {}",
-                        key, saddThrowable.getMessage()));
+                    redis.expire(key, Duration.ofHours(1)).subscribe(
+                        expireResult -> log.debug("Set expire for key: {}", key),
+                        expireThrowable -> log.error("Error during set expire for key: {}, error: {}",
+                            key, expireThrowable.getMessage())
+                    );
+                }
+            )
+            .doOnError(saddThrowable -> log.error("Error during adding to set for key: {}, error: {}",
+                key, saddThrowable.getMessage()));
     }
 
     public void sendCardsToConnectedUser(String boardId, WebSocketSession session) {
@@ -170,18 +171,20 @@ public class CacheClient {
         var cardIds = new ArrayList<String>();
 
         redis.smembers(key)
-                .doOnComplete(getAndSendCard(cardIds, boardId, session))
-                .subscribe(
-                        cardsId -> {
-                            log.debug("Add card id: {} to list", cardsId);
-                            cardIds.add(cardsId);
-                        },
-                        throwable -> log.error("Unable to get cards list due to:", throwable)
-                );
+            .doOnComplete(getAndSendCard(cardIds, boardId, session))
+            .subscribe(
+                cardsId -> {
+                    log.debug("Add card id: {} to list", cardsId);
+                    cardIds.add(cardsId);
+                },
+                throwable -> log.error("Unable to get cards list due to:", throwable)
+            );
     }
 
     private Runnable getAndSendCard(ArrayList<String> cardIds, String boardId, WebSocketSession session) {
         return () -> {
+            var objectMapper = new ObjectMapper();
+
             log.debug("Going to fetch: {} cards", cardIds.size());
             for (String cardId : cardIds) {
                 var key = String.format(BOARD_CARD, boardId, cardId);
@@ -200,44 +203,46 @@ public class CacheClient {
                 var cardData = redis.hgetall(key);
 
                 cardData.subscribe(
-                        //FIXME: needs to be optimised, to send a batch of cards instead one by one
-                        card -> {
-                            log.debug("Got card: {}", card);
-                            var cardValue = card.getValue();
-                            var cardKey = card.getKey();
-                            var eventField = EventFields.findByKey(cardKey);
-                            if (eventField == null) {
-                                log.error("Card cannot have null eventField");
-                                brokenBoardCard.set(true);
-                            } else {
-                                switch (eventField) {
-                                    case CATEGORY -> boardCard.category(cardValue);
-                                    case CONTENT -> boardCard.content(cardValue);
-                                    case USERNAME -> boardCard.username(cardValue);
-                                    default -> log.error("Unsupported key: {}", cardKey);
-                                }
-                            }
-                        },
-                        throwable -> log.error("Unable to fetch card due to:", throwable),
-                        () -> {
-                            if (!brokenBoardCard.get()) {
-                                likes.subscribe(
-                                    resLikes -> {
-                                        log.info("Number of likes: {}, for key: {}", resLikes, keyLikes);
-                                        boardCard.like(resLikes);
-                                    },
-                                    likesThrowable -> log.error("Unable to fetch likes onOpen due to:", likesThrowable),
-                                    () -> dislikes.subscribe(
-                                        resDislike -> {
-                                            log.info("Number of dislikes: {}, for key: {}", resDislike, keyDislikes);
-                                            boardCard.dislike(resDislike);
-                                        },
-                                        disLikesThrowable -> log.error("Unable to fetch dislikes onOpen due to:", disLikesThrowable),
-                                        () -> session.sendSync(boardCard.build(), MediaType.APPLICATION_JSON_TYPE)
-                                    )
-                                );
+                    //FIXME: needs to be optimised, to send a batch of cards instead one by one
+                    card -> {
+                        log.debug("Got card: {}", card);
+                        var cardValue = card.getValue();
+                        var cardKey = card.getKey();
+                        var eventField = EventFields.findByKey(cardKey);
+                        if (eventField == null) {
+                            log.error("Card cannot have null eventField");
+                            brokenBoardCard.set(true);
+                        } else {
+                            switch (eventField) {
+                                case CATEGORY -> boardCard.category(cardValue);
+                                case CONTENT -> boardCard.content(cardValue);
+                                case USERNAME -> boardCard.username(cardValue);
+                                default -> log.error("Unsupported key: {}", cardKey);
                             }
                         }
+                    },
+                    throwable -> log.error("Unable to fetch card due to:", throwable),
+                    () -> {
+                        if (!brokenBoardCard.get()) {
+                            likes.subscribe(
+                                resLikes -> {
+                                    log.info("Number of likes: {}, for key: {}", resLikes, keyLikes);
+                                    boardCard.like(resLikes);
+                                },
+                                likesThrowable -> log.error("Unable to fetch likes onOpen due to:", likesThrowable),
+                                () -> dislikes.subscribe(
+                                    resDislike -> {
+                                        log.info("Number of dislikes: {}, for key: {}", resDislike, keyDislikes);
+                                        boardCard.dislike(resDislike);
+                                    },
+                                    disLikesThrowable -> log.error("Unable to fetch dislikes onOpen due to:", disLikesThrowable),
+                                    () -> {
+                                        session.sendSync(boardCard.build(), MediaType.APPLICATION_JSON_TYPE);
+                                    }
+                                )
+                            );
+                        }
+                    }
                 );
             }
         };

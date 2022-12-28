@@ -331,11 +331,11 @@
             // FIXME: active class should be added after some ACK from the server.
             if (element.classList.toggle('active')) {
                 sendInternal(eventType, cardId, 1);
-            } else {
+            } else if (confirm(`Undo ${eventType} action?`)) {
                 //confirm() prevents for silly fast clicking for a while... :)
-                if (confirm(`Undo ${eventType} action?`)) {
-                    sendInternal(eventType, cardId, -1);
-                }
+                sendInternal(eventType, cardId, -1);
+            } else {
+                element.classList.toggle('active');
             }
             element.blur();
         }
@@ -348,11 +348,23 @@
             const hidden = !Object.hasOwn(card, "category") && username !== card.username;
             const section = hidden ? null : `#${card.category} > section`;
 
-            const userLiked = card.likes.includes(username);
-            const userDisliked = card.dislikes.includes(username);
+            let likesSize = 0;
+            let dislikeSize = 0;
+            let userLiked = false;
+            let userDisliked = false;
+
+            if (Object.hasOwn(card, "likes")) {
+                likesSize = card.likes.length;
+                userLiked = likesSize > 0 ? card.likes.includes(username) : false;
+            }
+
+            if (Object.hasOwn(card, "dislikes")) {
+                dislikeSize = card.dislikes.length;
+                userDisliked = dislikeSize > 0 ? card.dislikes.includes(username) : false;
+            }
 
             addCardElement(card.username, card.cardId, card.content, hidden, username !== card.username, section,
-                    card.likes.length, card.dislikes.length, userLiked, userDisliked);
+                likesSize, dislikeSize, userLiked, userDisliked);
         }
 
         function addCardElement(username, cardId, content, hidden, disabled, appendTo, likes = 0, dislikes = 0,
