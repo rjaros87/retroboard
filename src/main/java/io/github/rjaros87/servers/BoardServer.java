@@ -90,6 +90,13 @@ public class BoardServer {
                 publishEvent(userBoard, message);
                 break;
             case DELETE:
+                cacheClient.processCardDeletion(boardId, cardId)
+                    .subscribe(
+                        result -> {
+                            log.info("Number of deleted entries: {}", result);
+                            publishEvent(userBoard, message, true);
+                        }
+                    );
                 break;
             case LIKE:
                 cacheClient.processEmotionEvent(EventFields.LIKE, boardId, userBoard.getUsername(), message)
@@ -128,6 +135,13 @@ public class BoardServer {
         }
     }
 
+    /**
+     *
+     * @param userBoard UserBoard
+     * @param message contains object with event details
+     * @param forceBroadcast it's kind of confirmation that some process finished successfully and is handled on client
+     *                      WS
+     */
     public void publishEvent(UserBoard userBoard, EventMessage message, boolean forceBroadcast) {
         var userMessage = UserMessage.builder()
             .userBoard(userBoard)
@@ -136,6 +150,7 @@ public class BoardServer {
         var storageMessage = StorageMessage.builder()
             .userMessage(userMessage)
             .hostIp(hostIpAddress)
+            .forceBroadcast(forceBroadcast)
             .build();
         if (!Boolean.parseBoolean(System.getenv("DEBUG"))) {
             log.info("Going to broadcast message on the server");
@@ -171,10 +186,9 @@ public class BoardServer {
                     || Boolean.parseBoolean(System.getenv("DEBUG"))) {
                     var userMessage = storageMessage.getUserMessage();
                     var userBoard = userMessage.getUserBoard();
-                    log.info("Going to broadcast msg from publisher: {}, for board: {}", userMessage, userBoard.getBoardId());
-                    var eventTypeMessage = userMessage.getEventMessage().getEventType();
-                    var forceBroadcast = eventTypeMessage.equals(EventType.LIKE) ||
-                        eventTypeMessage.equals(EventType.DISLIKE);
+                    log.info("Going to broadcast msg from publisher: {}, for board: {}", userMessage,
+                        userBoard.getBoardId());
+                    var forceBroadcast = storageMessage.isForceBroadcast();
                     broadcaster.broadcastAsync(userMessage, MediaType.APPLICATION_JSON_TYPE, isValidRoom(userBoard,
                         forceBroadcast))
                         .orTimeout(500, TimeUnit.MILLISECONDS);

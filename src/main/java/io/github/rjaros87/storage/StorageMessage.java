@@ -15,4 +15,5 @@ import lombok.NoArgsConstructor;
 public class StorageMessage {
     private UserMessage userMessage;
     private String hostIp;
+    private boolean forceBroadcast;
 }

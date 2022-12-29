@@ -223,7 +223,7 @@
                         updateDislikes(eventMessage);
                         break;
                     case EventType.DELETE:
-
+                        deleteCard(eventMessage);
                         break;
                     default:
                         console.error("Unrecognized event type:", eventMessage.eventType);
@@ -243,6 +243,13 @@
             const card = $(containersSelector).find(`[data-id='${eventMessage.cardId}'] .card-header > ${emotionClass}`)
                     .first();
             card.text(eventMessage.content)
+        }
+
+        function deleteCard(eventMessage) {
+            const cardId = eventMessage.cardId;
+            const card = $(containersSelector).find(`[data-id='${cardId}']`).first();
+            console.log("Going to remove card: ", cardId);
+            card.remove();
         }
 
         function updateParticipantCard(userMessage) {
@@ -338,6 +345,15 @@
                 element.classList.toggle('active');
             }
             element.blur();
+        }
+
+        function deleteAction(element) {
+            const card = element.closest('.card');
+            const cardId = card.dataset.id;
+
+            if (confirm("Do you want to remove this card?")) {
+                sendInternal(EventType.DELETE, cardId);
+            }
         }
 
         function addCard() {

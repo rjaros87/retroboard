@@ -91,6 +91,8 @@ public class CacheClient {
                 key, field, content, throwable.getMessage()));
     }
 
+    //TODO: move this and dependant methods to separated class responsible for like/dislike actions. Also dedicated
+    // method for removing/cleaning after card is deleted
     public Mono<Long> processEmotionEvent(EventFields field, String boardId, String username, EventMessage message) {
         var cardId = message.getCardId();
         var content = Integer.parseInt(message.getContent());
@@ -137,6 +139,23 @@ public class CacheClient {
         } else {
             throw new RuntimeException("Unsupported event field for increment: " + field.getFieldKey());
         }
+    }
+
+    public Mono<Long> processCardDeletion(String boardId, String cardId) {
+        validateCardId(cardId);
+
+        var cardKey = String.format(BOARD_CARD, boardId, cardId);
+        var likeKey = String.format(BOARD_CARD_LIKES, boardId, cardId, EventFields.LIKE.getFieldKey());
+        var dislikeKey = String.format(BOARD_CARD_LIKES, boardId, cardId, EventFields.DISLIKE.getFieldKey());
+        var boardCardsKey = String.format(BOARD_CARDS, boardId);
+
+        var boardCardSet = redis.srem(boardCardsKey, cardId);
+        var cardComponents = redis.del(cardKey, likeKey, dislikeKey);
+
+        return cardComponents.zipWith(boardCardSet, Long::sum)
+            .doOnError(
+                throwable -> log.error("Error during deleting keys, error: {}", throwable.getMessage())
+            );
     }
 
     private void validateCardId(String cardId) {
