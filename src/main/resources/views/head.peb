@@ -31,12 +31,28 @@
             transform: translate(-50%,-50%);
         }
 
+        .card-body, .card-header {
+            padding: 0;
+        }
+
+        .card-header > button {
+            padding: 0;
+        }
+
         .card-footer, .card-header {
             line-height: 0.1em;
         }
 
         .card-footer > small {
             font-size: 0.5em;
+        }
+
+        textarea {
+            resize: none;
+        }
+
+        textarea:focus {
+            outline: none;
         }
     </style>
 </head>
