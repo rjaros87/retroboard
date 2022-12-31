@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rjaros87.model.Board;
 import io.github.rjaros87.model.BoardCard;
 import io.github.rjaros87.model.EventMessage;
+import io.github.rjaros87.model.UserBoard;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Singleton
 public class CacheClient {
     private final static String BOARD_CARDS = "retroboard:board:%s:cards";
+    private final static String BOARD_USERS = "retroboard:board:%s:users";
     private final static String BOARD_CARD = "retroboard:board:%s:cardId:%s";
     private final static String BOARD_CARD_LIKES = BOARD_CARD + ":%s";
 
@@ -202,8 +204,6 @@ public class CacheClient {
 
     private Runnable getAndSendCard(ArrayList<String> cardIds, String boardId, WebSocketSession session) {
         return () -> {
-            var objectMapper = new ObjectMapper();
-
             log.debug("Going to fetch: {} cards", cardIds.size());
             for (String cardId : cardIds) {
                 var key = String.format(BOARD_CARD, boardId, cardId);
@@ -293,5 +293,31 @@ public class CacheClient {
     public void publish(StorageMessage storageMessage) throws JsonProcessingException {
         var objectMapper = new ObjectMapper();
         redisPub.publish(REDIS_CHANNEL, objectMapper.writeValueAsString(storageMessage)).block();
+    }
+
+    // TODO: introduce user management and custom user settings
+    public Mono<Long> registerUser(UserBoard userBoard) {
+        var boardId = userBoard.getBoardId();
+        var key = String.format(BOARD_USERS, boardId);
+        var username = userBoard.getUsername();
+
+        return redis.sismember(key, username)
+            .flatMap(result -> {
+                log.info("User exists on the Board? {}", result);
+                if (!result) {
+                    return redis.sadd(key, username);
+                }
+                return Mono.error(new UserExistsException("User already exist: " + username));
+            });
+    }
+
+    public Flux<String> getConnectedUsers(String boardId) {
+        var key = String.format(BOARD_USERS, boardId);
+        return redis.smembers(key);
+    }
+
+    public Mono<Long> unregisterUser(UserBoard userBoard) {
+        var key = String.format(BOARD_USERS, userBoard.getBoardId());
+        return redis.srem(key, userBoard.getUsername());
     }
 }

@@ -39,6 +39,8 @@ import java.util.function.Predicate;
 @Singleton
 @ServerWebSocket(value = "/meeting/board/{boardId}/{username}")
 public class BoardServer {
+    private final static CloseReason USER_ALREADY_EXISTS = new CloseReason(4409,
+        "User already exist for this board. Choose other name and connect.");
     private final WebSocketBroadcaster broadcaster;
     private final CacheClient cacheClient;
     private String hostIpAddress;
@@ -62,6 +64,36 @@ public class BoardServer {
     public void onOpen(@RequestBean UserBoard userBoard, WebSocketSession session) {
         log.info("{} Joined!, session {}", userBoard.getUsername(), session.getId());
 
+        var boardId = userBoard.getBoardId();
+
+        cacheClient.registerUser(userBoard)
+        .subscribe(
+            result -> {
+                var username = userBoard.getUsername();
+                log.info("User: {} registered for boardId: {}",username, boardId);
+
+                cacheClient.getConnectedUsers(boardId)
+                    .subscribe(
+                        user -> {
+                            if (!user.equals(username)) {
+                                publishEventToCurrentUser(
+                                    userBoard,
+                                    EventMessage.builder()
+                                        .eventType(EventType.CONNECTED)
+                                        .content(user)
+                                        .build(),
+                                    session
+                                );
+                            }
+                        },
+                        throwable -> log.error("Error occurred during getConnectedUsers, due to:", throwable)
+                    );
+            },
+            throwable -> {
+                log.error("Error occurred during registerUser, going to close connection, due to:", throwable);
+                session.close(USER_ALREADY_EXISTS);
+            }
+        );
         cacheClient.sendCardsToConnectedUser(userBoard.getBoardId(), session);
     }
 
@@ -167,6 +199,14 @@ public class BoardServer {
         }
     }
 
+    public void publishEventToCurrentUser(UserBoard userBoard, EventMessage message, WebSocketSession session) {
+        var userMessage = UserMessage.builder()
+            .userBoard(userBoard)
+            .eventMessage(message)
+            .build();
+        session.sendSync(userMessage, MediaType.APPLICATION_JSON_TYPE);
+    }
+
     public void publishEvent(UserBoard userBoard, EventMessage message) {
         publishEvent(userBoard, message, false);
     }
@@ -203,6 +243,14 @@ public class BoardServer {
     @Consumes(MediaType.APPLICATION_JSON)
     public void onClose(@RequestBean UserBoard userBoard, WebSocketSession session, CloseReason closeReason) {
         log.info("[{}, {}] Disconnected! CloseReason: {}", userBoard.getBoardId(), userBoard.getUsername(), closeReason);
+
+        var user = userBoard.getUsername();
+
+        cacheClient.unregisterUser(userBoard)
+            .subscribe(
+                result -> log.info("User: {} unregistered", user),
+                throwable -> log.error("Unable to unregister user {}, due to:", user, throwable)
+            );
 
         processEvent(userBoard, new EventMessage(EventType.DISCONNECTED, null, userBoard.getUsername()), session);
         //TODO fire event Disconected
