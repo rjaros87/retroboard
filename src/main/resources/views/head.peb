@@ -37,6 +37,7 @@
 
         .card-header > button {
             padding: 0;
+            color: inherit;
         }
 
         .card-footer, .card-header {
@@ -45,10 +46,14 @@
 
         .card-footer > small {
             font-size: 0.5em;
+            color: inherit;
         }
 
-        textarea {
+        .card-body > .card-text > textarea {
             resize: none;
+            border: none;
+            background: none;
+            color: inherit;
         }
 
         textarea:focus {

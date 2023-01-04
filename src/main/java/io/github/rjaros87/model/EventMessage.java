@@ -24,4 +24,9 @@ public class EventMessage {
     @Nullable
     @Setter
     private String content;
+
+    @Override
+    public String toString() {
+        return "EventType: " + eventType.toString() + ", cardId: " + cardId + ", content: " + content;
+    }
 }

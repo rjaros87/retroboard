@@ -20,6 +20,27 @@
                 </div>
             </div>
         </div>
+        <div id="userSettingsModal" class="modal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">User settings</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3 row">
+                            <label for="username" class="col-sm-8 col-form-label">Card background color</label>
+                            <div class="col-sm-4">
+                                <input type="color" class="form-control" id="userColor" autocomplete="off" maxlength="10" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" onclick="saveUserSettings()">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="MultipleContainers" class="row flex-fill fill d-flex justify-content-start">
             <div id="good" class="retro-category col-3">
                 <header>Good</header>
@@ -78,7 +99,8 @@
             DISLIKE: 'dislike',
             ASSIGN: 'assign',
             CONNECTED: 'connected',
-            DISCONNECTED: 'disconnected'
+            DISCONNECTED: 'disconnected',
+            CARD_COLOR:'card_color'
         };
 
         const draggableClasses = {
@@ -98,7 +120,8 @@
             plugins: [Plugins.ResizeMirror],
         });
 
-        const myModal = new bootstrap.Modal(document.getElementById('usernameModal'), {"backdrop": "static"});
+        const usernameModal = new bootstrap.Modal(document.getElementById('usernameModal'), {"backdrop": "static"});
+        const userSettingsModal = new bootstrap.Modal(document.getElementById('userSettingsModal'), {"backdrop": "static"});
 
         let connection;
         let output;
@@ -143,7 +166,7 @@
         });
 
         $(function () {
-            myModal.show();
+            usernameModal.show();
         });
 
         function connect() {
@@ -154,7 +177,7 @@
             }
             console.log("The username: ", username);
 
-            myModal.hide();
+            usernameModal.hide();
 
             const hostname = window.location.hostname;
 
@@ -183,13 +206,70 @@
             };
         }
 
+        //TODO set default color on load user if color set
+        let defaultBackgroundColor = null;
+
+        function saveUserSettings() {
+            const bgColor = document.querySelector('#userSettingsModal input#userColor').value;
+            userSettingsModal.hide();
+
+            if (bgColor && defaultBackgroundColor !== bgColor) {
+                [r, g, b] = hexToRgb(bgColor);
+                const color = calculateFontColorBasedOnBackground(r, g, b);
+                const content = {
+                    backgroundColor: bgColor,
+                    fontColor: color
+                };
+
+                sendInternal(EventType.CARD_COLOR, null, content);
+            }
+        }
+
+        function showUserSettings() {
+            userSettingsModal.show();
+        }
+
+        function hexToRgb(hex) {
+            return hex.replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i
+                    , (m, r, g, b) => '#' + r + r + g + g + b + b)
+                    .substring(1).match(/.{2}/g)
+                    .map(x => parseInt(x, 16))
+        }
+
+        function calculateFontColorBasedOnBackground(r, g, b) {
+            // http://www.w3.org/TR/AERT#color-contrast
+            const brightness = Math.round(((r * 299) +
+                    (g * 587) +
+                    (b * 114)) / 1000);
+            return (brightness > 125) ? 'black' : 'white';
+        }
+
+        function updateUserBackground(element) {
+            const color = element.value;
+            const cards = document.querySelectorAll(".card");
+            updateCardsBackground(cards, color);
+        }
+
+        function updateCardsBackground(cards, bgColor) {
+            const [r, g, b] = hexToRgb(bgColor);
+            const fontColor = calculateFontColorBasedOnBackground(r, g, b);
+
+
+            if (cards.length > 0) {
+                cards.forEach(card => {
+                    card.style.background = bgColor;
+                    card.style.color = fontColor
+                })
+            }
+        }
+
         function addUserMenu() {
             document.getElementById('user-menu').innerHTML = `<div class="btn-group" role="group" aria-label="User">
                     <button type="button" class="btn btn-secondary dropdown-toggle text-uppercase" data-bs-toggle="dropdown" aria-expanded="false">
                       ${username.slice(0, 1)}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                      <li><a class="dropdown-item text-decoration-line-through" href="#">Change color</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="showUserSettings()">Change color</a></li>
                       <li><a class="dropdown-item text-decoration-line-through" href="#">Save as image</a></li>
                     </ul>
                 </div>`;
@@ -457,7 +537,7 @@
                 card.classList.add('d-none');
             }
 
-            const deleteAction = `<button class="btn btn-sm like" onclick="deleteAction(this)">
+            const deleteAction = `<button class="btn btn-sm" onclick="deleteAction(this)">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3 d-flex" viewBox="0 0 16 16">
   <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5ZM11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H2.506a.58.58 0 0 0-.01 0H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1h-.995a.59.59 0 0 0-.01 0H11Zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5h9.916Zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47ZM8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5Z"/>
 </svg>
@@ -487,7 +567,7 @@
                 </p>
               </div>
               <div class="card-footer">
-                <small class="text-muted">` + username + `</small>
+                <small>` + username + `</small>
               </div>
             `;
 

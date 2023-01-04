@@ -162,6 +162,9 @@ public class BoardServer {
                 cacheClient.storeEvent(EventFields.CATEGORY, boardId, cardId, message.getContent())
                     .subscribe(result -> publishEvent(userBoard, message));
                 break;
+            case CARD_COLOR:
+
+                break;
             default:
                 throw new UnsupportedOperationException("Unsupported event type: " + message.getEventType());
         }

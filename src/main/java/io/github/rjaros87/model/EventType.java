@@ -24,7 +24,10 @@ public enum EventType {
     CONNECTED,
 
     @JsonProperty("disconnected")
-    DISCONNECTED
+    DISCONNECTED,
+
+    @JsonProperty("card_color")
+    CARD_COLOR
 
     //TODO: Handle incorrect json property
 }
