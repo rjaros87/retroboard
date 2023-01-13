@@ -1,6 +1,7 @@
 package io.github.rjaros87.model;
 
 import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.json.tree.JsonNode;
 import jakarta.annotation.Nullable;
 import lombok.*;
 
@@ -25,8 +26,6 @@ public class EventMessage {
     @Setter
     private String content;
 
-    @Override
-    public String toString() {
-        return "EventType: " + eventType.toString() + ", cardId: " + cardId + ", content: " + content;
-    }
+    @Nullable
+    private JsonNode jsonContent;
 }

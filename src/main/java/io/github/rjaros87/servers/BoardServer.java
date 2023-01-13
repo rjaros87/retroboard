@@ -255,7 +255,8 @@ public class BoardServer {
                 throwable -> log.error("Unable to unregister user {}, due to:", user, throwable)
             );
 
-        processEvent(userBoard, new EventMessage(EventType.DISCONNECTED, null, userBoard.getUsername()), session);
+        processEvent(userBoard, new EventMessage(
+            EventType.DISCONNECTED, null, userBoard.getUsername(), null), session);
         //TODO fire event Disconected
         session.close(closeReason);
     }

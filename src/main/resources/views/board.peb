@@ -221,7 +221,7 @@
                     fontColor: color
                 };
 
-                sendInternal(EventType.CARD_COLOR, null, content);
+                sendInternal(EventType.CARD_COLOR, null, null, content);
             }
         }
 
@@ -299,11 +299,12 @@
             }
         }
 
-        function sendInternal(eventType, cardId, content) {
+        function sendInternal(eventType, cardId, content, jsonContent = null) {
             const message = {};
             message.content = content;
             message.cardId = cardId;
             message.eventType = eventType;
+            message.jsonContent = jsonContent;
 
             appendAndSend(message);
         }
