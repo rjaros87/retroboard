@@ -1,6 +1,9 @@
 plugins {
     id("com.github.johnrengelman.shadow") version "7.1.2"
-    id("io.micronaut.application") version "3.6.3"
+    id("io.micronaut.crac") version "3.7.0"
+    id "io.micronaut.minimal.application" version "3.7.0"
+    id "io.micronaut.docker" version "3.7.0"
+    id("io.micronaut.application") version "3.7.0"
 }
 
 version = "0.1"
@@ -19,6 +22,7 @@ dependencies {
     implementation("io.micronaut:micronaut-jackson-databind")
     implementation("io.micronaut:micronaut-validation")
     implementation("io.micronaut.redis:micronaut-redis-lettuce")
+    implementation("io.micronaut.crac:micronaut-crac")
 
     implementation("io.micronaut.views:micronaut-views-pebble")
 
@@ -67,6 +71,25 @@ micronaut {
     processing {
         incremental(true)
         annotations("io.github.rjaros87.*")
+    }
+
+    crac {
+        // is the plugin enabled or not
+        enabled = true
+
+        // the base docker image to use for the Checkpoint and final images
+        baseImage = "ubuntu:22.04"
+
+        // The platform to build the image for (currently must be linux/amd64)
+        platform = "linux/amd64"
+
+        // A command to run that will be successful when the application is ready to be checkpointed.
+//        preCheckpointReadinessCheck = "curl --output /dev/null --silent --head http://localhost:8080"
+
+        // You can use these to replace the script that generates a checkpoint, and the script that warms up the
+        // application prior to checkpointing
+        warmupScript = file("customWarmupScript.sh")
+//        checkpointScript = file("customCheckpointScript.sh")
     }
 }
 
