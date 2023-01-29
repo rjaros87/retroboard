@@ -76,6 +76,7 @@ micronaut {
     crac {
         // is the plugin enabled or not
         enabled = true
+        network = "localinfrastrucutre_app-tier"
 
         // the base docker image to use for the Checkpoint and final images
         baseImage = "ubuntu:22.04"
@@ -84,7 +85,7 @@ micronaut {
         platform = "linux/amd64"
 
         // A command to run that will be successful when the application is ready to be checkpointed.
-//        preCheckpointReadinessCheck = "curl --output /dev/null --silent --head http://localhost:8080"
+        preCheckpointReadinessCommand = "curl --output /dev/null --silent --head http://localhost:8080"
 
         // You can use these to replace the script that generates a checkpoint, and the script that warms up the
         // application prior to checkpointing
