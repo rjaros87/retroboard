@@ -9,6 +9,8 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
+
 @Slf4j
 @Requires(beans = {StatefulRedisConnection.class, StatefulRedisPubSubConnection.class})
 @Singleton
@@ -32,6 +34,9 @@ public class BeforeCheckpointEventListener implements ApplicationEventListener<B
     @Override
     public void onApplicationEvent(BeforeCheckpointEvent event) {
         redisConnection.close();
-        log.info("BeforeCheckpointEventListener time taken: {}", event.getTimeTakenNanos());
+        redisPub.close();
+        redisSub.close();
+        log.info("BeforeCheckpointEventListener time taken: {}", Duration.ofNanos(event.getTimeTakenNanos())
+            .toSeconds());
     }
 }

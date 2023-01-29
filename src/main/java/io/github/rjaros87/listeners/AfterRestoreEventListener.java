@@ -9,6 +9,8 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
+
 @Slf4j
 @Requires(beans = {StatefulRedisConnection.class, StatefulRedisPubSubConnection.class})
 @Singleton
@@ -31,6 +33,7 @@ public class AfterRestoreEventListener implements ApplicationEventListener<After
 
     @Override
     public void onApplicationEvent(AfterRestoreEvent event) {
-        log.info("AfterRestoreEventListener time taken: {}", event.getTimeTakenNanos());
+        log.info("AfterRestoreEventListener time taken: {}", Duration.ofNanos(event.getTimeTakenNanos())
+            .toSeconds());
     }
 }
